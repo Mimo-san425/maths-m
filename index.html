@@ -1,1 +1,316 @@
 
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>紙の長さを測るゲーム（メジャー風・2m固定・1m以上・10cm刻み）</title>
+<style>
+  :root{
+    --accent:#2f7cf6; --ok:#0ea66b; --ng:#d13f3f;
+    --bg:#f5f7fb; --panel:#ffffff;
+    --tape:#ffd84d; --tape-edge:#ffbf00; --tick:#111; --tick-sub:#666; --tick-weak:#999;
+    --red:#d23434;
+  }
+  html,body{margin:0;padding:0;background:var(--bg);color:#1d2433;
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; line-height:1.5}
+  header{padding:14px 16px;background:#fff;border-bottom:1px solid #e6e9ef}
+  h1{margin:0;font-size:18px;font-weight:700}
+  main{max-width:980px;margin:18px auto;padding:0 16px 40px}
+
+  .panel{background:var(--panel);border:1px solid #e6e9ef;border-radius:16px;padding:18px}
+
+  /* 見やすい問題カード */
+  .question-card{
+    display:flex; gap:12px; align-items:flex-start; background:#0f172a; color:#fff;
+    border-radius:14px; padding:14px 16px; box-shadow:0 6px 16px rgba(0,0,0,.15)
+  }
+  .q-icon{
+    width:36px; height:36px; border-radius:10px; background:#1e293b;
+    display:grid; place-items:center; font-size:20px
+  }
+  .q-text{flex:1}
+  .q-title{font-size:22px; font-weight:800; letter-spacing:.02em}
+  .q-hint{font-size:13px; color:#cbd5e1; margin-top:4px}
+
+  .status{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .pill{padding:6px 10px;border-radius:999px;background:#eef3ff;color:#2f4da0;font-size:12px;border:1px solid #d9e4ff}
+
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  button{padding:10px 14px;border:none;border-radius:10px;cursor:pointer;font-size:14px}
+  .btn-main{background:var(--accent);color:#fff}
+  .btn-sub{background:#fff;color:#333;border:1px solid #cdd6e1}
+
+  .grid{display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:16px}
+  .box{background:#f9fbff;border:1px solid #e6e9ef;border-radius:12px;padding:14px}
+  .label{font-size:12px;color:#6b7787;margin-bottom:6px}
+
+  input[type="number"]{padding:9px 10px;border:1px solid #cdd6e1;border-radius:10px;font-size:14px;background:#fff; width:100px}
+  .answer-wrap{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .result{margin-top:10px;font-weight:800}
+  .ok{color:var(--ok)} .ng{color:var(--ng)}
+
+  /* ===== メジャー（巻尺）風テープ ===== */
+  .tape-wrap{margin-top:16px;background:#fff;border:1px solid #e6e9ef;border-radius:14px;padding:14px}
+  .tape-label{font-size:12px;color:#6b7787;margin-bottom:6px}
+  .tape{
+    position:relative; height:120px; border-radius:10px; overflow:hidden;
+    border:1px solid #c8cbd2; background: var(--tape);
+    box-shadow: inset 0 -10px 16px rgba(0,0,0,.08), inset 0 10px 16px rgba(255,255,255,.35);
+  }
+  .tape::before, .tape::after{content:""; position:absolute; left:0; right:0; height:10px; background:var(--tape-edge)}
+  .tape::before{top:0} .tape::after{bottom:0}
+  .tape .grain{
+    position:absolute; inset:10px 0; background:
+      repeating-linear-gradient( -45deg, rgba(0,0,0,0.05) 0 6px, rgba(0,0,0,0.00) 6px 16px);
+    pointer-events:none;
+  }
+  .hook{
+    position:absolute; left:0; top:0; bottom:0; width:18px; background:linear-gradient(180deg,#9aa3af,#cbd5e1);
+    border-right:2px solid #6b7280; z-index:3
+  }
+  .hook::after{
+    content:""; position:absolute; right:-6px; top:50%; transform:translateY(-50%);
+    width:12px; height:12px; border-radius:50%; background:#6b7280; box-shadow:0 0 0 3px rgba(0,0,0,.15);
+  }
+  .rivet{
+    position:absolute; top:14px; right:14px; width:14px; height:14px; border-radius:50%;
+    background:#9aa3af; box-shadow: inset 0 2px 2px rgba(255,255,255,.7), inset 0 -2px 2px rgba(0,0,0,.25);
+  }
+
+  .ticks{ position:absolute; left:0; right:0; top:0; bottom:0; display:flex; z-index:2 }
+  .tick{ width:1px; background:var(--tick); align-self:flex-start; margin-left:0; position:relative }
+  .tick.c1{ height:22px; background:var(--tick-weak) }   /* 1cm */
+  .tick.c5{ height:34px; background:var(--tick-sub) }   /* 5cm */
+  .tick.c10{ height:46px; background:var(--tick) }      /* 10cm */
+  .tick-label{
+    position:absolute; top:54px; transform:translateX(-50%); font-size:13px; font-weight:800;
+    color:#111; letter-spacing:.02em
+  }
+  .tick-label.red{ color:var(--red) }
+
+  .paper{
+    position:absolute; left:0; height:28px; top:76px; background:#cfe3ff;
+    border:1px solid #99bff7; border-radius:6px; z-index:1
+  }
+  .paper::after{
+    content:""; position:absolute; right:-6px; top:-6px; width:12px; height:12px;
+    border-radius:50%; background:#99bff7; box-shadow:0 0 0 3px rgba(153,191,247,.25)
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>紙の長さを測るゲーム（メジャー風・2m固定・1m以上・10cm刻み）</h1>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="question-card" aria-live="polite">
+      <div class="q-icon" aria-hidden="true">📏</div>
+      <div class="q-text">
+        <div id="qTitle" class="q-title">「スタート / 次の問題」を押してください</div>
+        <div id="qHint" class="q-hint"></div>
+      </div>
+    </div>
+
+    <div class="status" role="status" aria-live="polite">
+      <span class="pill">問題数: <span id="qCount">0</span></span>
+      <span class="pill">正解数: <span id="qCorrect">0</span></span>
+      <span class="pill">スコア: <span id="score">0</span>点</span>
+    </div>
+
+    <div class="controls" aria-label="操作">
+      <button id="startBtn" class="btn-main">スタート / 次の問題</button>
+      <button id="resetBtn" class="btn-sub">リセット</button>
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <div class="label">回答（〇m〇cm と入力）</div>
+        <div class="answer-wrap" aria-label="回答入力">
+          <input type="number" id="mInput" min="1" max="2" step="1" placeholder="m" aria-label="メートルを入力（1〜2）">
+          <span>m</span>
+          <input type="number" id="cmInput" min="0" max="99" step="1" placeholder="cm" aria-label="センチメートルを入力（0〜99）">
+          <span>cm</span>
+          <button id="answerBtn" class="btn-main">答え合わせ</button>
+        </div>
+        <div id="result" class="result" aria-live="polite"></div>
+      </div>
+
+      <div class="box">
+        <div class="label">ヒント</div>
+        <div style="font-size:14px;color:#334155">
+          ・出題は <strong>1m（100cm）以上、最大2m（200cm）まで</strong>。<br>
+          ・長さは<strong>10cmごと</strong>です（例：1m20cm、1m90cm、2m00cm）。<br>
+          ・入力は <strong>m と cm を分けて</strong>（例：<code>1m 20cm</code>）。
+        </div>
+      </div>
+    </div>
+
+    <div class="tape-wrap">
+      <div id="tapeLabel" class="tape-label">テープ：最大 2m</div>
+      <div class="tape" id="tape" aria-label="巻尺（1cm目盛）">
+        <div class="hook" aria-hidden="true"></div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="rivet" aria-hidden="true"></div>
+        <div class="ticks" id="ticks"></div>
+        <div class="paper" id="paper" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+
+  const state = {
+    maxCm: 200,          // ★ 2m固定
+    tolerance: 0,        // ぴったりのみ（必要なら 1 or 2 に変更可）
+    targetCm: null,
+    qCount:0,
+    qCorrect:0,
+    score:0
+  };
+
+  function updateStatus(){
+    $('qCount').textContent = state.qCount;
+    $('qCorrect').textContent = state.qCorrect;
+    $('score').textContent = state.score;
+  }
+
+  function setQuestion(title, hint=''){
+    $('qTitle').textContent = title;
+    $('qHint').textContent = hint;
+    $('result').textContent = '';
+    $('result').className = 'result';
+  }
+
+  function cmToMcm(cm){
+    const m = Math.floor(cm/100);
+    const r = cm%100;
+    return {m, cm:r};
+  }
+
+  // 目盛（0〜200cm、1cm刻み、5/10cm強調）
+  function buildTicks(maxCm){
+    const ticks = $('ticks');
+    ticks.innerHTML = '';
+    for(let i=0;i<=maxCm;i++){
+      const d = document.createElement('div');
+      let cls = 'tick c1';
+      if(i%10===0) cls='tick c10';
+      else if(i%5===0) cls='tick c5';
+      d.className = cls;
+      d.style.marginLeft = (i===0 ? '0' : 'calc((100%)/'+maxCm+')');
+      ticks.appendChild(d);
+
+      if(i%10===0){
+        const lab = document.createElement('div');
+        lab.className = 'tick-label' + (i>0 ? ' red' : '');
+        lab.textContent = i + 'cm';
+        lab.style.left = (i/maxCm*100) + '%';
+        d.appendChild(lab);
+      }
+    }
+  }
+
+  function drawPaper(cm){
+    const pct = cm/state.maxCm*100;
+    $('paper').style.width = pct + '%';
+  }
+
+  // ★ 1m以上（100cm）〜2m（200cm）、10cm刻み固定
+  function randomTarget(){
+    const step = 10;
+    const min = 100;
+    const max = state.maxCm; // 200
+    const values = [];
+    for(let v=min; v<=max; v+=step) values.push(v);
+    return values[Math.floor(Math.random()*values.length)];
+  }
+
+  function nextQuestion(){
+    state.tolerance = 0; // ぴったり固定。±1/±2を許すなら 1 or 2 に変える
+
+    state.targetCm = randomTarget();
+    const eg = cmToMcm(state.targetCm);
+    setQuestion('この紙の長さを当てよう！（1m以上・10cm刻み・最大2m）',
+                '例：' + eg.m + 'm ' + (eg.cm.toString().padStart(2,'0')) + 'cm のように入力。');
+    drawPaper(state.targetCm);
+
+    $('mInput').value = '';
+    $('cmInput').value = '';
+    $('mInput').setAttribute('min','1'); // 1m以上
+    $('mInput').setAttribute('max','2');
+    $('cmInput').setAttribute('min','0');
+    $('cmInput').setAttribute('max','99');
+    // 入力しやすいようにフォーカス
+    setTimeout(()=> $('mInput').focus(), 0);
+
+    state.qCount++;
+    updateStatus();
+  }
+
+  function checkAnswer(){
+    if(state.targetCm===null) return;
+
+    const mVal = $('mInput').value.trim();
+    const cmVal = $('cmInput').value.trim();
+
+    if(mVal==='' || cmVal===''){
+      $('result').textContent = 'm と cm の両方を入力してください。';
+      $('result').className = 'result ng';
+      return;
+    }
+
+    const m = parseInt(mVal,10);
+    const cm = parseInt(cmVal,10);
+
+    if(isNaN(m) || isNaN(cm) || m<1 || m>2 || cm<0 || cm>=100){
+      $('result').textContent = '入力が正しくありません（mは1〜2、cmは0〜99）。';
+      $('result').className = 'result ng';
+      return;
+    }
+
+    const total = m*100 + cm;
+    if(total<100 || total>state.maxCm){
+      $('result').textContent = '範囲外です（100〜200cmの間で入力）。';
+      $('result').className = 'result ng';
+      return;
+    }
+
+    const diff = Math.abs(total - state.targetCm);
+    const ok = diff <= state.tolerance;
+
+    if(ok){
+      $('result').textContent = '◎ 正解！ ぴったり ' + m + 'm' + cm.toString().padStart(2,'0') + 'cm';
+      $('result').className = 'result ok';
+      state.qCorrect++;
+      state.score += 10;
+    }else{
+      const ans = cmToMcm(state.targetCm);
+      $('result').textContent = '× ざんねん… 正解は ' + ans.m + 'm' + ans.cm.toString().padStart(2,'0') + 'cm';
+      $('result').className = 'result ng';
+    }
+    updateStatus();
+  }
+
+  $('startBtn').addEventListener('click', nextQuestion);
+  $('answerBtn').addEventListener('click', checkAnswer);
+  $('resetBtn').addEventListener('click', ()=>{
+    state.qCount=0; state.qCorrect=0; state.score=0; state.targetCm=null;
+    updateStatus();
+    setQuestion('リセットしました。「スタート / 次の問題」を押してください','');
+    $('result').textContent='';
+    $('paper').style.width='0%';
+    buildTicks(state.maxCm);
+  });
+
+  // 初期描画（2m目盛）
+  buildTicks(state.maxCm);
+})();
+</script>
+</body>
+</html>
